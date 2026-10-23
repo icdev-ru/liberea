@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% from "_card.html" import book_list, view_switch %}
+{% from "_pager.html" import pager, books_count %}
+{% set names_mode = scope in ('author', 'series') %}
+{% block title %}{% if q %}{{ q }} — {% endif %}{{ site_title }}{% endblock %}
+{% block topsearch %}{% endblock %}
+{% block content %}
+<form class="search" action="/" method="get">
+  <div class="search-row">
+    <input type="search" name="q" autocomplete="off" autocorrect="off" spellcheck="false" value="{{ q }}" placeholder="{{ {'author': 'Имя или фамилия автора', 'series': 'Название серии'}.get(scope, 'Название, автор, серия, код или слова из текста') }}" autofocus>
+    <button type="submit">Найти</button>
+  </div>
+  <input type="hidden" name="view" value="{{ view }}">
+  <div class="search-opts">
+    <div class="seg" role="radiogroup" aria-label="Где искать">
+      {% for k, label in [('all','Везде'),('title','Название'),('author','Автор'),('series','Серия'),('text','Текст')] %}
+      <label><input type="radio" name="scope" value="{{ k }}" {% if scope==k %}checked{% endif %} onchange="this.form.requestSubmit()"><span>{{ label }}</span></label>
+      {% endfor %}
+    </div>
+    {% if libs|length > 1 %}
+    <label class="sort">Библиотека
+      <select name="lib" onchange="this.form.requestSubmit()">
+        <option value="" {% if not lib %}selected{% endif %}>все</option>
+        {% for k, label in libs.items() %}<option value="{{ k }}" {% if lib==k %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    {% if not names_mode %}
+    <label class="sort">Язык
+      <select name="lang" onchange="this.form.requestSubmit()">
+        {% for k, label in [('','все'),('ru','русский'),('en','английский'),('other','другие')] %}
+        <option value="{{ k }}" {% if lang==k %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label class="sort">Сортировка
+      <select name="sort" onchange="this.form.requestSubmit()">
+        {% for k, label in [('rank','по релевантности'),('title','по названию'),('author','по автору'),('code','по коду'),('new','новые')] %}
+        <option value="{{ k }}" {% if sort==k %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {% endif %}
+    <details class="help"><summary>Синтаксис</summary>
+      <div>
+        <p><code>любовь деревня</code> — оба слова, любые формы (любви, деревне…)</p>
+        <p><code>"в деревне"</code> — точная фраза</p>
+        <p><code>деревн*</code> — по началу слова</p>
+        <p><code>мама -война</code> — исключить слово</p>
+        <p><code>ab-421</code> — по коду книги</p>
+        {% if has_inpx %}<p><code>фэнтези</code>, <code>детектив</code> — книги {{ inpx_label }} ищутся и по жанру, серии, ключевым словам (текст не индексируется)</p>{% endif %}
+        <p>Русский и английский можно смешивать: <code>mom мама</code></p>
+      </div>
+    </details>
+  </div>
+</form>
+
+{% if start %}
+<section class="start">
+  <div class="start-stats">
+    {% for k, label in libs.items() %}
+    <div><b>{{ "{:,}".format(st.get(k, 0)).replace(",", " ") }}</b><span>{{ label }}</span></div>{% endfor %}
+    <div><b>{{ "{:,}".format(st.authors).replace(",", " ") }}</b><span>авторов</span></div>
+    {% if st.series %}<div><b>{{ "{:,}".format(st.series).replace(",", " ") }}</b><span>серий</span></div>{% endif %}
+  </div>
+  <div class="start-help">
+    <h2>Как искать</h2>
+    <ul>
+      <li><b>Везде</b> — по названию, автору, серии, коду и тексту книги. Слова находятся в любой форме: <code>деревня</code> найдёт «в деревне».</li>
+      <li><b>Название</b> / <b>Текст</b> — только в названиях или только в тексте книг{% if has_inpx %} (у книг части «{{ inpx_label }}» текст не индексируется){% endif %}.</li>
+      <li><b>Автор</b> — выдаёт список авторов с числом книг. Нажмите на автора — откроются все его книги: сначала по сериям, затем остальные.</li>
+      <li><b>Серия</b> — список серий с числом книг; нажмите на серию — книги по порядку.</li>
+      {% if 'inpx' in libs %}<li><a href="/genres"><b>Жанры</b></a> (вверху страницы) — все жанры и поджанры; в жанре книги показываются новые сначала или по алфавиту.</li>{% endif %}
+    </ul>
+    <p class="muted small">Подсказки: <code>"точная фраза"</code>, <code>начало*</code>, <code>-исключить</code>, код книги <code>ab-421</code>.
+      Найденное можно добавлять в подборки (кнопка «+ В подборку») и скачивать подборку целиком в PDF или FB2 — раздел
+      <a href="/my">Мои подборки</a>.</p>
+    <p class="muted small"><b>Каталог для читалок (OPDS):</b> добавьте в FBReader, Moon+ Reader, CoolReader, KOReader и т. п.
+      сетевой каталог <code>{{ request.base_url }}opds</code> — поиск, авторы, серии и жанры прямо в читалке.</p>
+  </div>
+</section>
+{% elif names_mode %}
+<div class="results-head">
+  <div class="rh-left"><span>Найдено {{ 'авторов' if scope == 'author' else 'серий' }}: <b>{{ total }}</b></span></div>
+</div>
+{% if names %}
+<section class="name-list">
+  {% for n in names %}
+  <a class="name-row" href="/{{ 'author' if scope == 'author' else 'series' }}?name={{ n.name|urlencode }}{% if lib and scope == 'author' %}&lib={{ lib }}{% endif %}"
+    title="{{ n.name }}{% if scope == 'series' and n.authors %} — {{ n.authors }}{% endif %}">
+    <span class="nr-name">{{ n.name }}{% if scope == 'series' and n.authors %} <span class="nr-sub">{{ n.authors }}</span>{% endif %}</span>
+    <span class="nr-count">{{ n.n }}</span>
+  </a>
+  {% endfor %}
+</section>
+{% else %}
+<p class="empty">Ничего не найдено. Попробуйте часть имени или <code>начало*</code>.</p>
+{% endif %}
+{{ pager(request, page, pages) }}
+{% else %}
+<div class="results-head">
+  <div class="rh-left">
+    <span>Найдено: <b>{{ total }}</b></span>
+    {{ view_switch(request, view) }}
+  </div>
+  {% if total %}
+  <span class="rh-right">
+  {% if is_admin and tr_on %}
+  <button type="button" class="btn-ghost" id="tr-all" data-q="{{ q }}" data-scope="{{ scope }}" data-lib="{{ lib }}" data-lang="{{ lang }}"
+    title="Поставить в очередь перевода все найденные английские книги">Перевести найденные англ.</button>
+  {% endif %}
+  <button type="button" class="btn-ghost" id="add-all" data-q="{{ q }}" data-scope="{{ scope }}" data-lib="{{ lib }}" data-lang="{{ lang }}">
+    + Добавить все найденные ({{ total if total < 2000 else 2000 }}) в подборку</button>
+  </span>
+  {% endif %}
+</div>
+
+{% if books %}
+{{ book_list(books, view, in_active, q, can_tr) }}
+{% else %}
+<p class="empty">Ничего не найдено. Попробуйте другие слова или искать «Везде».</p>
+{% endif %}
+{{ pager(request, page, pages) }}
+{% endif %}
+{% endblock %}

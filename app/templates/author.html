@@ -1,0 +1,28 @@
+{% extends "base.html" %}
+{% from "_card.html" import book_list, view_switch %}
+{% from "_pager.html" import pager, books_count %}
+{% block title %}{{ name }} — {{ site_title }}{% endblock %}
+{% block content %}
+<p class="back"><a href="/" onclick="if (history.length > 1) { history.back(); return false; }">← назад</a></p>
+<div class="list-head">
+  <div>
+    <h1>{{ name }}</h1>
+    <p class="muted">{{ books_count(total) }}{% if nser %} · серий: {{ nser }}{% endif %}{% if lib %} · только {{ lib_names.get(lib, lib) }} (<a href="{{ page_url(request, lib='', page=1) }}">показать все</a>){% endif %}</p>
+  </div>
+  <div class="toolbar">
+    {{ view_switch(request, view) }}
+    {% if total %}<button type="button" class="btn-ghost" id="add-all" data-author="{{ name }}" data-lib="{{ lib }}" data-lang="{{ lang }}">
+      + Все книги автора в подборку</button>{% endif %}
+  </div>
+</div>
+{% for s, books in groups %}
+<section class="series-block">
+  <h2 class="series-title">{% if s %}<a href="/series?name={{ s|urlencode }}">{{ s }}</a>{% else %}Вне серий{% endif %}
+    <span class="muted">· {{ books_count(books|length) }}{% if loop.first and page > 1 %} (продолжение){% endif %}</span></h2>
+  {{ book_list(books, view, in_active, '', can_tr) }}
+</section>
+{% else %}
+<p class="empty">Книг этого автора не найдено.</p>
+{% endfor %}
+{{ pager(request, page, pages) }}
+{% endblock %}

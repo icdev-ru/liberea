@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block title %}Жанры — {{ site_title }}{% endblock %}
+{% block content %}
+<div class="list-head">
+  <h1>Жанры</h1>
+  {% if libs|length > 1 %}
+  <form method="get" class="inline-form" style="margin:0">
+    <label class="sort">Библиотека
+      <select name="lib" onchange="this.form.requestSubmit()">
+        <option value="" {% if not lib %}selected{% endif %}>все</option>
+        {% for k, label in libs.items() %}<option value="{{ k }}" {% if lib==k %}selected{% endif %}>{{ label }}</option>{% endfor %}
+      </select>
+    </label>
+  </form>
+  {% endif %}
+</div>
+{% if groups %}
+<nav class="genre-toc">
+  {% for title, items, total in groups %}<a href="#g{{ loop.index }}">{{ title }}</a>{% endfor %}
+</nav>
+{% for title, items, total in groups %}
+<section class="genre-group" id="g{{ loop.index }}">
+  <h2>{{ title }}</h2>
+  <div class="name-list">
+    {% for g in items %}
+    <a class="name-row" href="/genre/{{ g.code|urlencode }}{% if lib %}?lib={{ lib }}{% endif %}" title="{{ g.name }} ({{ g.code }})">
+      <span class="nr-name">{{ g.name }}</span><span class="nr-count">{{ g.n }}</span>
+    </a>
+    {% endfor %}
+  </div>
+</section>
+{% endfor %}
+{% else %}
+<p class="empty">Жанры есть только у книг коллекции INPX. Укажите файл .inpx в «Настройках» админки и импортируйте коллекцию.</p>
+{% endif %}
+{% endblock %}

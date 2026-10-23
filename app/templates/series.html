@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% from "_card.html" import book_list, view_switch, author_links %}
+{% from "_pager.html" import books_count %}
+{% block title %}{{ name }} — {{ site_title }}{% endblock %}
+{% block content %}
+<p class="back"><a href="/" onclick="if (history.length > 1) { history.back(); return false; }">← назад</a></p>
+<div class="list-head">
+  <div>
+    <p class="muted small">Серия</p>
+    <h1>{{ name }}</h1>
+    <p class="muted">{{ books_count(books|length) }}{% if authors %} · {{ author_links(authors|join(', ')) }}{% endif %}</p>
+  </div>
+  <div class="toolbar">
+    {{ view_switch(request, view) }}
+    {% if books %}<button type="button" class="btn-ghost" id="add-all" data-series="{{ name }}" data-lang="{{ lang }}">
+      + Вся серия в подборку</button>{% endif %}
+  </div>
+</div>
+{{ book_list(books, view, in_active, '', can_tr) }}
+{% if not books %}<p class="empty">В серии нет книг.</p>{% endif %}
+{% endblock %}

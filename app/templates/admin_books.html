@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Книги — админка{% endblock %}
+{% block content %}
+{% set sec = 'books' %}{% include "_admin_nav.html" %}
+<h1>Книги <span class="muted">({{ total }})</span></h1>
+<form class="inline-form" method="get">
+  <input type="search" name="q" autocomplete="off" autocorrect="off" spellcheck="false" value="{{ q }}" placeholder="Название, автор, код, папка">
+  <select name="filt">
+    {% for k, label in [('',"все"),('main',lib_names.main),('rus',lib_names.rus),('inpx',lib_names.inpx),('hidden','скрытые'),('nocover','без обложки'),('noauthor','без автора'),('locked','с ручной правкой')] %}
+    <option value="{{ k }}" {% if filt==k %}selected{% endif %}>{{ label }}</option>{% endfor %}
+  </select>
+  <button>Показать</button>
+</form>
+<table class="table small">
+  <thead><tr><th>Код</th><th>Название</th><th>Автор</th><th>Обл.</th><th>Размер</th><th>Кодировка</th><th></th></tr></thead>
+  <tbody>
+  {% for b in rows %}
+  <tr {% if b.hidden %}class="is-hidden"{% endif %}>
+    <td class="mono">{{ b.code }}</td>
+    <td><a href="/book/{{ b.id }}">{{ b.title }}</a>{% if b.meta_locked %} <span class="tag" title="Метаданные исправлены вручную">✎</span>{% endif %}{% if b.hidden %} <span class="tag">скрыта</span>{% endif %}</td>
+    <td>{{ b.author }}</td><td>{{ '✓' if b.cover_file else '—' }}</td>
+    <td>{{ b.txt_size|size }}</td><td>{{ b.encoding }}</td>
+    <td><a href="/admin/book/{{ b.id }}">изменить</a></td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if pages > 1 %}
+<nav class="pager">
+  {% if page > 1 %}<a href="{{ page_url(request, page=page-1) }}">← Назад</a>{% endif %}
+  <span>стр. {{ page }} из {{ pages }}</span>
+  {% if page < pages %}<a href="{{ page_url(request, page=page+1) }}">Дальше →</a>{% endif %}
+</nav>
+{% endif %}
+{% endblock %}

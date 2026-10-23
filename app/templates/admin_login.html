@@ -1,0 +1,13 @@
+{% extends "base.html" %}
+{% block title %}Вход — {{ site_title }}{% endblock %}
+{% block content %}
+<section class="panel narrow">
+  <h1>Вход в админку</h1>
+  {% if wait %}<p class="notice bad">Слишком много неудачных попыток. Попробуйте через {{ wait }} с.</p>
+  {% elif err %}<p class="notice bad">Неверный пароль</p>{% endif %}
+  <form action="/admin/login" method="post" class="stack">
+    <input type="password" name="password" placeholder="Пароль" autofocus required>
+    <button>Войти</button>
+  </form>
+</section>
+{% endblock %}

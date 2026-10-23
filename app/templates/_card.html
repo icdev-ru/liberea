@@ -1,0 +1,131 @@
+{% macro share_btn(b, ru=False, big=False) -%}
+<details class="share{% if big %} big{% endif %}" data-book="{{ b.id }}" data-ru="{{ '1' if ru else '' }}" data-title="{{ b.title }}{% if b.author %} — {{ b.author }}{% endif %}">
+  <summary title="Поделиться" aria-label="Поделиться"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="M8.6 13.5l6.8 4M15.4 6.5l-6.8 4"/></svg>{% if big %}<span>Поделиться{% if ru %} переводом{% endif %}</span>{% endif %}</summary>
+  <div class="share-menu">
+    {% for f in ['fb2', 'pdf', 'txt'] %}<button type="button" class="share-item" data-fmt="{{ f }}">{{ f|upper }}</button>{% endfor %}
+    <button type="button" class="share-item" data-fmt="link">Ссылка</button>
+  </div>
+</details>
+{%- endmacro %}
+
+{% macro author_links(author, html=None) -%}
+{% if html %}{% set parts = html.split(', ') %}{% else %}{% set parts = [] %}{% endif %}
+{% set all = author.split(', ') %}{% set lim = 4 if all|length > 5 else 5 %}
+{% for a in all[:lim] %}<a href="/author?name={{ a|urlencode }}">{{ (parts[loop.index0] if parts|length == all|length else a|e)|safe }}</a>{% if not loop.last %}, {% endif %}{% endfor %}
+{%- if all|length > lim %} <span class="more-authors" title="{{ all[lim:]|join(', ') }}">и ещё {{ all|length - lim }}</span>{% endif %}
+{%- endmacro %}
+
+{% macro cover_img(b, alt='') -%}
+{% if b.cover_file %}
+<img loading="lazy" src="/cover/{{ b.id }}?thumb=1" alt="{{ alt }}"{% if b.cover_file == '?' %} onerror="this.hidden=true;this.nextElementSibling.hidden=false"{% endif %}>
+{% if b.cover_file == '?' %}<div class="nocover" hidden><span>{{ b.title }}</span><small>{{ b.author|truncate(60, True, "…") }}</small></div>{% endif %}
+{% else %}
+<div class="nocover"><span>{{ b.title }}</span><small>{{ b.author|truncate(60, True, "…") }}</small></div>
+{% endif %}
+{%- endmacro %}
+
+{% macro cover_tile(b, in_active, q='') -%}
+<figure class="tile" data-id="{{ b.id }}" title="{{ b.title }}{% if b.author %} — {{ b.author }}{% endif %}">
+  <a class="cover" href="/book/{{ b.id }}{% if q %}?q={{ q|urlencode }}{% endif %}">
+    {% if b.llm_status == 'done' %}<span class="tile-ru star" title="Качественный перевод">RU★</span>
+    {% elif b.tr_status == 'done' %}<span class="tile-ru" title="Есть перевод">RU</span>
+    {% elif b.tr_status in ('queued','running') %}<span class="tile-ru wait" title="Переводится">RU…</span>
+    {% elif b.lang == 'en' %}<span class="tile-ru none" title="Английская, перевода нет">EN</span>{% endif %}
+    {{ cover_img(b, b.title) }}
+  </a>
+  <button type="button" class="tile-add btn-add {% if b.id in in_active %}is-in{% endif %}" data-book="{{ b.id }}"
+    data-short="1" title="В подборку">{% if b.id in in_active %}✓{% else %}+{% endif %}</button>
+</figure>
+{%- endmacro %}
+
+{% macro tr_line(b, can_tr=False) -%}
+{% if b.lang == 'en' or b.tr_status or b.llm_status %}
+<div class="tr-line" data-book="{{ b.id }}">
+  {% if b.tr_status == 'done' or b.llm_status == 'done' %}
+    {% if b.llm_status == 'done' %}<span class="tr-badge star" title="Качественный перевод (LLM)">RU★</span>
+    {% else %}<span class="tr-badge" title="Черновой перевод">RU</span>{% endif %} <span>Перевод:</span>
+    <a href="/book/{{ b.id }}/download.txt?ru=1">TXT</a>
+    <a href="/book/{{ b.id }}/download.pdf?ru=1">PDF</a>
+    <a href="/book/{{ b.id }}/download.fb2?ru=1">FB2</a>
+    {% if b.llm_status in ('queued', 'running') %}<span class="muted">· ★ в очереди</span>{% endif %}
+  {% elif b.tr_status in ('queued', 'running') or b.llm_status in ('queued', 'running') %}
+    <span class="tr-badge wait">RU…</span> <span class="muted">переводится / в очереди</span>
+  {% elif b.tr_status == 'error' %}
+    <span class="tr-badge none">EN</span> <span class="bad">перевод не удался</span>
+    {% if can_tr %}<button type="button" class="tr-go" data-book="{{ b.id }}">повторить</button>{% endif %}
+  {% else %}
+    <span class="tr-badge none">EN</span> <span class="muted">перевода нет</span>
+    {% if can_tr %}<button type="button" class="tr-go" data-book="{{ b.id }}">Перевести</button>{% endif %}
+  {% endif %}
+</div>
+{% endif %}
+{%- endmacro %}
+
+{% macro card(b, in_active, q='', can_tr=False) -%}
+<article class="card" data-id="{{ b.id }}">
+  <a class="cover" href="/book/{{ b.id }}{% if q %}?q={{ q|urlencode }}{% endif %}">
+    {{ cover_img(b, '') }}
+  </a>
+  <div class="card-body">
+    <h3 class="card-title"><a href="/book/{{ b.id }}{% if q %}?q={{ q|urlencode }}{% endif %}">{{ (b.title_html or b.title|e)|safe }}</a></h3>
+    {% if b.author %}<div class="card-author">{{ author_links(b.author, b.author_html) }}</div>{% endif %}
+    <div class="card-meta">{{ b.code }}{% if b.fmt == 'fb2' %} · fb2{% endif %}{% if b.chars %} · {{ "{:,}".format(b.chars).replace(",", " ") }} зн.{% elif b.txt_size %} · {{ b.txt_size|size }}{% endif %}{% if b.lang and b.lang not in ('ru', 'en') %} · {{ b.lang }}{% endif %}{% if b.pubdate %} · <span title="Добавлена в коллекцию">{{ b.pubdate }}</span>{% endif %}</div>
+    {% if b.series %}<div class="card-meta"><a href="/series?name={{ b.series|urlencode }}">{{ b.series }}</a>{% if b.serno %} #{{ b.serno }}{% endif %}</div>{% endif %}
+    {% if b.genre %}<div class="card-meta genres">{% for g in b.genre.split(':') if g %}<a href="/genre/{{ g|urlencode }}">{{ genre_name(g) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</div>{% endif %}
+    {% if b.snippet %}<p class="snippet">{% if b.snippet_ru %}<span class="tag">в переводе</span> {% endif %}{{ b.snippet|safe }}</p>{% endif %}
+    {{ tr_line(b, can_tr) }}
+    <div class="card-actions">
+      <span class="dl">
+        <a href="/book/{{ b.id }}/download.txt">TXT</a>
+        <a href="/book/{{ b.id }}/download.pdf">PDF</a>
+        <a href="/book/{{ b.id }}/download.fb2">FB2</a>
+      </span>
+      {{ share_btn(b) }}
+      <button type="button" class="btn-add {% if b.id in in_active %}is-in{% endif %}" data-book="{{ b.id }}"
+        title="Добавить в активную подборку">{% if b.id in in_active %}✓ В подборке{% else %}+ В подборку{% endif %}</button>
+    </div>
+  </div>
+</article>
+{%- endmacro %}
+
+{% macro list_row(b, in_active, q='') -%}
+<div class="lrow" data-id="{{ b.id }}">
+  <div class="lr-main">
+    <a class="lr-title" href="/book/{{ b.id }}{% if q %}?q={{ q|urlencode }}{% endif %}">{{ (b.title_html or b.title|e)|safe }}</a>
+    {% if b.series %}<span class="lr-series"><a href="/series?name={{ b.series|urlencode }}">{{ b.series }}</a>{% if b.serno %} #{{ b.serno }}{% endif %}</span>{% endif %}
+    {% if b.author %}<div class="lr-author">{{ author_links(b.author, b.author_html) }}</div>{% endif %}
+  </div>
+  <div class="lr-meta">
+    {% if b.llm_status == 'done' %}<span class="tr-badge star" title="Качественный перевод">RU★</span>
+    {% elif b.tr_status == 'done' %}<span class="tr-badge" title="Есть перевод">RU</span>
+    {% elif b.lang == 'en' %}<span class="tr-badge none" title="Английская">EN</span>
+    {% elif b.lang and b.lang != 'ru' %}<span class="tr-badge none">{{ b.lang|upper }}</span>{% endif %}
+    {% if b.genre %}<span class="lr-genre">{% for g in b.genre.split(':') if g %}{% if loop.index <= 2 %}<a href="/genre/{{ g|urlencode }}">{{ genre_name(g) }}</a>{% if not loop.last and loop.index < 2 %}, {% endif %}{% endif %}{% endfor %}</span>{% endif %}
+    <span class="lr-size">{% if b.chars %}{{ "{:,}".format(b.chars).replace(",", " ") }} зн.{% elif b.txt_size %}{{ b.txt_size|size }}{% endif %}</span>
+  </div>
+  <div class="lr-act">
+    <span class="dl"><a href="/book/{{ b.id }}/download.txt">TXT</a><a href="/book/{{ b.id }}/download.pdf">PDF</a><a href="/book/{{ b.id }}/download.fb2">FB2</a></span>
+    {{ share_btn(b) }}
+    <button type="button" class="btn-add {% if b.id in in_active %}is-in{% endif %}" data-book="{{ b.id }}" data-short="1"
+      title="В подборку">{% if b.id in in_active %}✓{% else %}+{% endif %}</button>
+  </div>
+</div>
+{%- endmacro %}
+
+{% macro book_list(books, view, in_active, q='', can_tr=False) -%}
+{% if view == 'covers' %}
+<section class="cover-grid">{% for b in books %}{{ cover_tile(b, in_active, q) }}{% endfor %}</section>
+{% elif view == 'list' %}
+<section class="lrows">{% for b in books %}{{ list_row(b, in_active, q) }}{% endfor %}</section>
+{% else %}
+<section class="grid">{% for b in books %}{{ card(b, in_active, q, can_tr) }}{% endfor %}</section>
+{% endif %}
+{%- endmacro %}
+
+{% macro view_switch(request, view, reset_page=True) -%}
+<span class="seg view-seg" role="group" aria-label="Вид">
+  {% for k, label in [('cards', 'Карточки'), ('list', 'Списком'), ('covers', 'Только обложки')] %}
+  <a href="{{ page_url(request, view=k, page=1) if reset_page else page_url(request, view=k) }}" class="{{ 'on' if view == k }}">{{ label }}</a>
+  {% endfor %}
+</span>
+{%- endmacro %}

@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Мои подборки — {{ site_title }}{% endblock %}
+{% block content %}
+<h1>Мои подборки</h1>
+{% if msg %}<p class="notice">{{ msg }}</p>{% endif %}
+<p class="muted">Подборка — это список книг, собранный из разных поисков. Одна подборка <b>активная</b>:
+кнопка «+ В подборку» добавляет книги в неё. Из подборки можно собрать один PDF или FB2 с содержанием.</p>
+
+<form class="inline-form" action="/my/new" method="post">
+  <input name="name" placeholder="Название новой подборки" required>
+  <button>Создать</button>
+</form>
+
+{% if colls %}
+<table class="table">
+  <thead><tr><th>Название</th><th>Книг</th><th>Изменена</th><th></th></tr></thead>
+  <tbody>
+  {% for c in colls %}
+  <tr {% if active and active.id == c.id %}class="is-active"{% endif %}>
+    <td><a href="/my/{{ c.id }}">{{ c.name }}</a>{% if active and active.id == c.id %} <span class="tag">активная</span>{% endif %}</td>
+    <td>{{ c.n }}</td>
+    <td class="muted">{{ c.updated }}</td>
+    <td class="right">
+      {% if not (active and active.id == c.id) %}
+      <form action="/my/{{ c.id }}/activate" method="post" class="inline"><button class="btn-ghost small">Сделать активной</button></form>
+      {% endif %}
+      <button type="button" class="btn-ghost small rename-row" data-coll="{{ c.id }}" data-name="{{ c.name }}" title="Изменить название">✎ Имя</button>
+      <a class="btn-ghost small" href="/my/{{ c.id }}/export.json" download>JSON</a>
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p class="empty">Подборок пока нет. Нажмите «+ В подборку» у любой книги — подборка создастся сама.</p>
+{% endif %}
+
+<div class="two-col">
+  <section class="panel">
+    <h2>Загрузить подборку из файла</h2>
+    <form action="/my/import" method="post" enctype="multipart/form-data" class="inline-form">
+      <input type="file" name="file" accept=".json,application/json" required>
+      <button>Загрузить</button>
+    </form>
+    <p class="muted small">Файл JSON, сохранённый кнопкой «JSON». Книги сопоставляются по папке, затем по коду.</p>
+  </section>
+  <section class="panel">
+    <h2>Ваш ключ</h2>
+    <p class="muted small">Подборки привязаны к этому браузеру. Чтобы открыть их на другом компьютере
+    или после очистки cookie, введите там этот ключ.</p>
+    <p><code class="key" id="owner-key">{{ owner }}</code> <button type="button" class="btn-ghost small" data-copy="#owner-key">Копировать</button></p>
+    <form action="/my/key" method="post" class="inline-form">
+      <input name="key" placeholder="Вставьте ключ" required minlength="16">
+      <button>Применить</button>
+    </form>
+  </section>
+</div>
+{% endblock %}

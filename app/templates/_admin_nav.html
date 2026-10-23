@@ -1,0 +1,7 @@
+<nav class="subnav">
+  <a href="/admin" {% if sec=='home' %}class="on"{% endif %}>Обзор</a>
+  <a href="/admin/books" {% if sec=='books' %}class="on"{% endif %}>Книги</a>
+  <a href="/admin/log" {% if sec=='log' %}class="on"{% endif %}>Журнал импорта</a>
+  <a href="/admin/settings" {% if sec=='settings' %}class="on"{% endif %}>Настройки</a>
+  <a href="/admin/logout">Выйти</a>
+</nav>

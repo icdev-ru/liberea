@@ -1,0 +1,116 @@
+{% extends "base.html" %}
+{% from "_card.html" import share_btn, author_links %}
+{% block title %}{{ b.title }} — {{ site_title }}{% endblock %}
+{% block content %}
+<p class="back"><a href="/" onclick="if (history.length > 1) { history.back(); return false; }">← к результатам</a></p>
+<article class="book">
+  <div class="book-cover">
+    {% if has_cover %}
+    <a href="/cover/{{ b.id }}" target="_blank"><img src="/cover/{{ b.id }}" alt="Обложка"></a>
+    {% else %}
+    <div class="nocover big"><span>{{ b.title }}</span><small>{{ b.author }}</small></div>
+    {% endif %}
+  </div>
+  <div class="book-info">
+    <h1>{{ (b.title_html or b.title|e)|safe }}</h1>
+    {% if b.author %}<p class="book-author">{{ author_links(b.author, b.author_html) }}</p>{% endif %}
+    <dl class="facts">
+      <dt>Код</dt><dd>{{ b.code or '—' }}</dd>
+      {% if b.series %}<dt>Серия</dt><dd><a href="/series?name={{ b.series|urlencode }}">{{ b.series }}</a>{% if b.serno %} · № {{ b.serno }}{% endif %}</dd>{% endif %}
+      {% if genres %}<dt>Жанр</dt><dd>{% for g in b.genre.split(':') if g %}<a href="/genre/{{ g|urlencode }}">{{ genre_name(g) }}</a>{% if not loop.last %}, {% endif %}{% endfor %}</dd>{% endif %}
+      <dt>Объём</dt><dd>{% if b.chars %}{{ "{:,}".format(b.chars).replace(",", " ") }} знаков · {% endif %}{{ b.txt_size|size }}</dd>
+      <dt>Библиотека</dt><dd>{{ lib_names.get(b.src, b.src) }} · {{ b.fmt|upper }}{% if b.pubdate %} · добавлена {{ b.pubdate }}{% endif %}</dd>
+      {% if b.keywords %}<dt>Ключевые слова</dt><dd>{{ b.keywords }}</dd>{% endif %}
+      <dt>Язык</dt><dd>{{ {'ru':'русский','en':'английский'}.get(b.lang, b.lang or '—') }}</dd>
+      {% if is_admin %}<dt>Файл</dt><dd class="mono">{{ b.file_path if b.src in ('rus', 'inpx') else b.dir_name ~ '\\' ~ b.txt_file }}</dd>
+      <dt>Кодировка</dt><dd>{{ b.encoding }}</dd>{% endif %}
+    </dl>
+    <div class="downloads">
+      <a class="btn" href="/book/{{ b.id }}/download.txt">Скачать TXT</a>
+      <a class="btn" href="/book/{{ b.id }}/download.pdf">Скачать PDF</a>
+      <a class="btn" href="/book/{{ b.id }}/download.fb2">Скачать FB2</a>
+      {{ share_btn(b, big=True) }}
+    </div>
+    {% if b.lang == 'en' or tr.status != 'none' or lt.status != 'none' %}
+    <div class="tr-box" id="translation" data-book="{{ b.id }}" data-status="{{ tr.status }}" data-llm="{{ lt.status }}">
+      {% if has_ru %}
+        <div class="tr-head"><b>Перевод на русский</b>
+          {% if lt.status == 'done' %}<span class="tag">качественный (LLM)</span>{% else %}<span class="tag">черновой</span>{% endif %}</div>
+        <div class="downloads">
+          <a class="btn" href="/book/{{ b.id }}/download.txt?ru=1">TXT рус.</a>
+          <a class="btn" href="/book/{{ b.id }}/download.pdf?ru=1">PDF рус.</a>
+          <a class="btn" href="/book/{{ b.id }}/download.fb2?ru=1">FB2 рус.</a>
+          {{ share_btn(b, ru=True, big=True) }}
+        </div>
+      {% endif %}
+      <div class="tr-rows">
+        <div class="tr-row">
+          <span class="tr-kind">Черновой</span>
+          {% if tr.status == 'done' %}
+            <span class="muted small">готов · {{ tr.engine }}{% if tr.seconds %}, {{ (tr.seconds/60)|round(1) }} мин{% endif %}</span>
+            {% if is_admin %}<form method="post" action="/admin/translation/{{ b.id }}/delete" class="inline"
+              onsubmit="return confirm('Удалить черновой перевод?')"><button class="btn-ghost small danger">удалить</button></form>{% endif %}
+          {% elif tr.status in ('queued', 'running') %}
+            <span class="bar grow"><i id="tr-bar" style="width: {{ ((tr.done or 0) * 100 / (tr.total or 1))|round|int }}%"></i></span>
+            <span class="muted small" id="tr-text">{% if tr.status == 'queued' %}в очереди{% if tr.position %}: {{ tr.position }}-я{% endif %}{% else %}переводится…{% endif %}</span>
+          {% elif tr.status == 'error' %}
+            <span class="bad small">ошибка: {{ tr.error }}</span>
+            {% if can_tr %}<button type="button" class="btn-ghost small" id="tr-start">повторить</button>{% endif %}
+          {% elif can_tr %}
+            <button type="button" class="btn-ghost small" id="tr-start">Перевести быстро</button>
+            <span class="muted small">несколько минут</span>
+          {% else %}<span class="muted small">нет</span>{% endif %}
+        </div>
+        {% if can_llm or lt.status != 'none' %}
+        <div class="tr-row">
+          <span class="tr-kind">Качественный</span>
+          {% if lt.status == 'done' %}
+            <span class="muted small">готов · {{ lt.engine }}{% if lt.seconds %}, {{ (lt.seconds/60)|round|int }} мин{% endif %}</span>
+            {% if is_admin %}<form method="post" action="/admin/llm/{{ b.id }}/delete" class="inline"
+              onsubmit="return confirm('Удалить качественный перевод?')"><button class="btn-ghost small danger">удалить</button></form>{% endif %}
+          {% elif lt.status in ('queued', 'running') %}
+            <span class="bar grow"><i id="llm-bar" style="width: {{ ((lt.done or 0) * 100 / (lt.total or 1))|round|int }}%"></i></span>
+            <span class="muted small" id="llm-text">{% if lt.status == 'queued' %}в очереди{% if lt.position %}: {{ lt.position }}-я{% endif %}{% else %}переводится…{% endif %}</span>
+          {% elif lt.status == 'error' %}
+            <span class="bad small">ошибка: {{ lt.error }}</span>
+            {% if can_llm %}<button type="button" class="btn-ghost small" id="llm-start">повторить</button>{% endif %}
+          {% elif can_llm %}
+            <button type="button" class="btn-ghost small" id="llm-start">Перевести качественно (LLM)</button>
+            <span class="muted small">долго: 1–2 часа на книгу, идёт в фоне</span>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+    </div>
+    {% endif %}
+    <div class="add-box">
+      <button type="button" class="btn-add {% if b.id in in_active %}is-in{% endif %}" data-book="{{ b.id }}">
+        {% if b.id in in_active %}✓ В подборке{% else %}+ В активную подборку{% endif %}</button>
+      {% if colls|length > 1 %}
+      <details class="other-colls"><summary>в другую подборку…</summary>
+        <ul>
+        {% for c in colls %}
+          <li><label><input type="checkbox" class="coll-toggle" data-book="{{ b.id }}" data-coll="{{ c.id }}" {% if c.has %}checked{% endif %}> {{ c.name }}</label></li>
+        {% endfor %}
+        </ul>
+      </details>
+      {% endif %}
+      {% if is_admin %}<a class="btn-ghost" href="/admin/book/{{ b.id }}">Редактировать</a>{% endif %}
+    </div>
+  </div>
+</article>
+<section class="preview">
+  <h2>Начало текста</h2>
+  {% for p in preview %}<p>{{ p }}</p>{% endfor %}
+  {% if not preview %}<p class="empty">Текст пустой или недоступен.</p>{% endif %}
+  <p class="fade"><a href="/book/{{ b.id }}/open/{{ b.code or 'book' }}.txt" target="_blank">Читать полностью (TXT) →</a></p>
+</section>
+{% if tr_preview %}
+<section class="preview">
+  <h2>Начало перевода{% if lt.status == 'done' %} (качественный){% endif %}</h2>
+  {% for p in tr_preview %}<p>{{ p }}</p>{% endfor %}
+  <p class="fade"><a href="/book/{{ b.id }}/open/{{ b.code or 'book' }}-ru.txt?ru=1" target="_blank">Читать перевод полностью (TXT) →</a></p>
+</section>
+{% endif %}
+{% endblock %}
+{% block scripts %}<script>initTranslate();</script>{% endblock %}

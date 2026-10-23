@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% block title %}Настройки — админка{% endblock %}
+{% block content %}
+{% set sec = 'settings' %}{% include "_admin_nav.html" %}
+<h1>Настройки</h1>
+{% if saved %}<p class="notice">Сохранено и применено. Если поменяли папки — запустите сканирование на странице «Обзор».</p>{% endif %}
+{% if err == 'short' %}<p class="notice bad">Новый пароль слишком короткий — нужно не меньше 6 символов.</p>{% endif %}
+{% if err == 'mismatch' %}<p class="notice bad">Новые пароли не совпадают.</p>{% endif %}
+<form method="post" class="settings">
+  {% set ns = namespace(group='') %}
+  {% for f in fields %}
+    {% if f.sec != ns.group %}
+      {% if ns.group %}</fieldset>{% endif %}
+      {% set ns.group = f.sec %}
+      <fieldset class="panel"><legend>{{ {'site': 'Сайт', 'library': 'Основная библиотека', 'extra': 'Дополнительная библиотека', 'inpx': 'Коллекция INPX'}[f.sec] }}</legend>
+    {% endif %}
+    {% if f.typ == 'bool' %}
+      <label class="check"><input type="checkbox" name="{{ f.sec }}.{{ f.key }}" value="1" {% if f.value %}checked{% endif %}> {{ f.label }}</label>
+    {% else %}
+      <label>{{ f.label }}
+        <input name="{{ f.sec }}.{{ f.key }}" value="{{ f.value }}" {% if f.typ == 'path' %}class="mono" spellcheck="false"{% endif %}>
+        {% if f.typ == 'path' and f.value %}<small class="{{ 'ok' if f.exists else 'bad' }}">{{ '✓ найдено' if f.exists else '✗ такого пути нет на сервере' }}</small>{% endif %}
+        {% if f.hint %}<small class="muted">{{ f.hint }}</small>{% endif %}
+      </label>
+    {% endif %}
+  {% endfor %}
+  </fieldset>
+  <fieldset class="panel"><legend>Пароль администратора</legend>
+    <p class="muted small">Оставьте пустым, чтобы не менять.</p>
+    <label>Новый пароль <input type="password" name="password" minlength="6" autocomplete="new-password"></label>
+    <label>Ещё раз <input type="password" name="password2" minlength="6" autocomplete="new-password"></label>
+  </fieldset>
+  <div class="toolbar"><button class="btn">Сохранить</button></div>
+</form>
+<p class="muted small">Изменения хранятся в <code>{{ settings_file }}</code> и накладываются поверх <code>config.toml</code>.
+  Остальные параметры (порт, перевод, PDF и т. п.) — в <code>config.toml</code>; после его правки перезапустите программу.</p>
+{% endblock %}

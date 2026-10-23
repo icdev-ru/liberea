@@ -1,0 +1,13 @@
+# Либерея — запуск через Docker Compose:   docker compose up -d
+# Затем откройте http://<адрес-сервера>:5555/setup и укажите папки с книгами
+# (внутри контейнера они видны как /books/...).
+services:
+  liberea:
+    image: ghcr.io/icdev-ru/liberea:latest   # или соберите сами:  build: .
+    container_name: liberea
+    restart: unless-stopped
+    ports:
+      - "5555:5555"
+    volumes:
+      - ./data:/data                # база, кеш, настройки, модели перевода
+      - /srv/books:/books:ro        # ваши книги (только чтение) — поменяйте путь слева

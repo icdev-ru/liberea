@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Журнал импорта — {{ site_title }}{% endblock %}
+{% block content %}
+{% set sec = 'log' %}{% include "_admin_nav.html" %}
+<h1>Журнал импорта</h1>
+<form class="inline-form" method="get">
+  <label>Сканирование
+    <select name="scan" onchange="this.form.requestSubmit()">
+      {% for s in scans %}<option value="{{ s.id }}" {% if s.id == scan %}selected{% endif %}>#{{ s.id }} — {{ s.started }}</option>{% endfor %}
+    </select></label>
+  <label>Уровень
+    <select name="level" onchange="this.form.requestSubmit()">
+      <option value="">все</option>
+      <option value="error" {% if level=='error' %}selected{% endif %}>ошибки</option>
+      <option value="warning" {% if level=='warning' %}selected{% endif %}>предупреждения</option>
+    </select></label>
+</form>
+{% if rows %}
+<table class="table small">
+  <thead><tr><th>Уровень</th><th>Папка</th><th>Сообщение</th></tr></thead>
+  <tbody>
+  {% for r in rows %}
+  <tr><td class="{{ 'bad' if r.level=='error' else 'warn' }}">{{ 'ошибка' if r.level=='error' else 'предупр.' }}</td>
+    <td class="mono">{{ r.dir_name }}</td><td>{{ r.message }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}<p class="empty">Записей нет.</p>{% endif %}
+{% endblock %}

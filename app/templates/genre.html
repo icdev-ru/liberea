@@ -1,0 +1,37 @@
+{% extends "base.html" %}
+{% from "_card.html" import book_list, view_switch %}
+{% from "_pager.html" import pager, books_count %}
+{% block title %}{{ name }} — {{ site_title }}{% endblock %}
+{% block content %}
+<p class="back"><a href="/genres{% if lib %}?lib={{ lib }}{% endif %}">← все жанры</a></p>
+<div class="list-head">
+  <div>
+    <p class="muted small">Жанр</p>
+    <h1>{{ name }}</h1>
+    <p class="muted">{{ books_count(total) }}</p>
+  </div>
+  <form method="get" class="search-opts" style="margin:0">
+    {% if lib %}<input type="hidden" name="lib" value="{{ lib }}">{% endif %}
+    <label class="sort">Сортировка
+      <select name="sort" onchange="this.form.requestSubmit()">
+        <option value="date" {% if sort=='date' %}selected{% endif %}>по дате добавления</option>
+        <option value="title" {% if sort=='title' %}selected{% endif %}>по алфавиту</option>
+      </select>
+    </label>
+    <label class="sort">Язык
+      <select name="lang" onchange="this.form.requestSubmit()">
+        {% for k, label in [('','все'),('ru','русский'),('en','английский'),('other','другие')] %}
+        <option value="{{ k }}" {% if lang==k %}selected{% endif %}>{{ label }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    {{ view_switch(request, view) }}
+  </form>
+</div>
+{% if books %}
+{{ book_list(books, view, in_active, '', can_tr) }}
+{% else %}
+<p class="empty">В этом жанре нет книг{% if lang %} на выбранном языке{% endif %}.</p>
+{% endif %}
+{{ pager(request, page, pages) }}
+{% endblock %}

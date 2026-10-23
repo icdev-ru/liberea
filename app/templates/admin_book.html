@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}{{ b.title }} — правка{% endblock %}
+{% block content %}
+{% set sec = 'books' %}{% include "_admin_nav.html" %}
+<h1>Правка книги</h1>
+{% if saved %}<p class="notice">Сохранено.</p>{% endif %}
+<div class="two-col">
+<section class="panel">
+  <form method="post" class="stack">
+    <label>Код <input name="code" value="{{ b.code }}"></label>
+    <label>Название <input name="title" value="{{ b.title }}" required></label>
+    <label>Автор <input name="author" value="{{ b.author }}"></label>
+    <label class="check"><input type="checkbox" name="hidden" value="1" {% if b.hidden %}checked{% endif %}> Скрыть из открытой части</label>
+    <label class="check"><input type="checkbox" name="meta_locked" value="1" {% if b.meta_locked %}checked{% endif %}> Не перезаписывать метаданные при сканировании</label>
+    <div class="toolbar">
+      <button class="btn">Сохранить</button>
+      <button class="btn-ghost" name="reset" value="1" onclick="return confirm('Вернуть исходные название, автора и код?')">Сбросить к исходным</button>
+    </div>
+  </form>
+</section>
+<section class="panel">
+  <dl class="facts">
+    <dt>Файл</dt><dd class="mono">{{ path }}</dd>
+    <dt>Библиотека</dt><dd>{{ lib_names.get(b.src, b.src) }} · {{ b.fmt|upper }}</dd>
+    <dt>Обложка</dt><dd class="mono">{{ b.cover_file or '—' }}</dd>
+    <dt>Кодировка</dt><dd>{{ b.encoding }}</dd>
+    <dt>Язык</dt><dd>{{ b.lang }}</dd>
+    <dt>Размер</dt><dd>{{ b.txt_size|size }}, {{ b.chars }} знаков</dd>
+    <dt>Добавлена</dt><dd>{{ b.added_at }}</dd>
+    <dt>Обновлена</dt><dd>{{ b.updated_at }}</dd>
+  </dl>
+  <p><a href="/book/{{ b.id }}">Открыть карточку →</a></p>
+</section>
+</div>
+{% endblock %}

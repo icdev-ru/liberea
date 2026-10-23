@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block title %}{{ c.name }} — {{ site_title }}{% endblock %}
+{% block content %}
+<p class="back"><a href="/my">← Мои подборки</a></p>
+<div class="coll-head">
+  <div class="coll-title" id="coll-title">
+    <h1>{{ c.name }}</h1>
+    <button type="button" class="btn-ghost small" id="rename-btn" title="Изменить название подборки">✎ Изменить имя</button>
+  </div>
+  <form action="/my/{{ c.id }}/rename" method="post" class="rename" id="rename-form" hidden>
+    <input name="name" value="{{ c.name }}" aria-label="Название подборки" required maxlength="200">
+    <button class="btn small">Сохранить</button>
+    <button type="button" class="btn-ghost small" id="rename-cancel">Отмена</button>
+  </form>
+  <div class="muted">Книг: <b id="coll-count">{{ books|length }}</b>
+    {% if active and active.id == c.id %}<span class="tag">активная</span>{% endif %}</div>
+</div>
+
+<div class="toolbar">
+  <button type="button" class="btn build" data-coll="{{ c.id }}" data-fmt="pdf" {% if not books %}disabled{% endif %}>Собрать PDF</button>
+  <button type="button" class="btn build" data-coll="{{ c.id }}" data-fmt="fb2" {% if not books %}disabled{% endif %}>Собрать FB2</button>
+  {% if can_tr %}
+  <button type="button" class="btn-ghost" id="coll-tr" data-coll="{{ c.id }}" {% if not untr %}disabled{% endif %}
+    title="Поставить в очередь перевода английские книги подборки без перевода">Перевести непереведённые ({{ untr }})</button>
+  {% endif %}
+  {% if can_llm %}
+  <button type="button" class="btn-ghost" id="coll-llm" data-coll="{{ c.id }}" {% if not unllm %}disabled{% endif %}
+    title="Поставить в очередь качественного перевода (LLM) английские книги подборки">Качественный перевод ★ ({{ unllm }})</button>
+  {% endif %}
+  <label class="check small" title="Для книг, у которых есть готовый перевод, взять русский текст"><input type="checkbox" id="build-ru"> переводы вместо оригиналов</label>
+  <a class="btn-ghost" href="/my/{{ c.id }}/export.json">Сохранить в файл (JSON)</a>
+  {% if not (active and active.id == c.id) %}
+  <form action="/my/{{ c.id }}/activate" method="post" class="inline"><input type="hidden" name="back" value="/my/{{ c.id }}"><button class="btn-ghost">Сделать активной</button></form>
+  {% endif %}
+  <form action="/my/{{ c.id }}/copy" method="post" class="inline"><button class="btn-ghost">Копия</button></form>
+  <form action="/my/{{ c.id }}/clear" method="post" class="inline" onsubmit="return confirm('Убрать все книги из подборки?')"><button class="btn-ghost">Очистить</button></form>
+  <form action="/my/{{ c.id }}/delete" method="post" class="inline" onsubmit="return confirm('Удалить подборку «{{ c.name|e }}»?')"><button class="btn-ghost danger">Удалить</button></form>
+</div>
+<div id="build-status" class="build-status" hidden></div>
+
+{% if books %}
+<p class="muted small">Порядок книг = порядок в PDF/FB2. Перетащите строку или используйте стрелки.</p>
+<ol class="coll-list" id="coll-list" data-coll="{{ c.id }}">
+  {% for b in books %}
+  <li draggable="true" data-id="{{ b.id }}">
+    <span class="handle" title="Перетащить">⋮⋮</span>
+    <span class="num"></span>
+    {% if b.cover_file %}<img loading="lazy" src="/cover/{{ b.id }}?thumb=1" alt="" onerror="this.style.visibility='hidden'">{% else %}<span class="nocover tiny"></span>{% endif %}
+    <span class="li-main"><a href="/book/{{ b.id }}">{{ b.title }}</a><small>{{ b.author }} · {{ b.code }}</small></span>
+    {% if b.llm_status == 'done' %}<span class="tr-badge star" title="Качественный перевод">RU★</span>
+    {% elif b.llm_status in ('queued','running') %}<span class="tr-badge wait" title="Качественный перевод в очереди">★…</span>
+    {% elif b.tr_status == 'done' %}<span class="tr-badge" title="Есть перевод">RU</span>
+    {% elif b.tr_status in ('queued','running') %}<span class="tr-badge wait" title="Переводится">RU…</span>
+    {% elif b.tr_status == 'error' %}<span class="tr-badge none bad" title="Ошибка перевода">EN!</span>
+    {% elif b.lang == 'en' %}<span class="tr-badge none" title="Перевода нет">EN</span>{% endif %}
+    <span class="li-act">
+      <button type="button" class="icon up" title="Выше">↑</button>
+      <button type="button" class="icon down" title="Ниже">↓</button>
+      <button type="button" class="icon remove" data-book="{{ b.id }}" data-coll="{{ c.id }}" title="Убрать из подборки">✕</button>
+    </span>
+  </li>
+  {% endfor %}
+</ol>
+{% else %}
+<p class="empty">Подборка пуста. Найдите книги и нажмите «+ В подборку» {% if not (active and active.id == c.id) %}(сначала сделайте эту подборку активной){% endif %}.</p>
+{% endif %}
+{% endblock %}

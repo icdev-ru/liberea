@@ -1,0 +1,13 @@
+# данные и локальные настройки
+/data/
+/config.toml
+/dist/
+# Python
+__pycache__/
+*.py[cod]
+/.venv/
+/python/
+.pytest_cache/
+# системное
+.DS_Store
+Thumbs.db

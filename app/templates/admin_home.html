@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Админка — {{ site_title }}{% endblock %}
+{% block content %}
+{% set sec = 'home' %}{% include "_admin_nav.html" %}
+<h1>Админка</h1>
+{% if request.query_params.get('welcome') %}<p class="notice">Пароль сохранён. Теперь нажмите «Сканировать» у библиотеки, которую указали,
+  или задайте папки в <a href="/admin/settings">«Настройках»</a>.</p>{% endif %}
+
+<div class="stats">
+  <div><b>{{ st.books or 0 }}</b><span>книг</span></div>
+  <div><b>{{ st.covers or 0 }}</b><span>с обложкой</span></div>
+  <div><b>{{ st.hidden or 0 }}</b><span>скрыто</span></div>
+  <div><b>{{ st.size|size }}</b><span>текстов</span></div>
+  <div><b>{{ db_size|size }}</b><span>база</span></div>
+  <div><b>{{ cache_size|size }}</b><span>кеш</span></div>
+  <div><b>{{ st.collections }}</b><span>подборок у {{ st.owners }} польз.</span></div>
+</div>
+
+<section class="panel">
+  <h2>Сканирование</h2>
+  <p class="muted small">Обычное сканирование обрабатывает только новые и изменённые книги; полное — переиндексирует всё.
+    Одновременно идёт только одно сканирование.</p>
+  <div class="scan-libs">
+    <div>
+      <h3>{{ cfg.main_label }} <span class="muted">({{ st.main or 0 }})</span></h3>
+      {% if cfg.main_enabled %}
+      <p class="muted small mono">{{ cfg.library_root }}</p>
+      <div class="toolbar">
+        <button class="btn scan-btn" data-kind="main" data-force="0">Сканировать</button>
+        <button class="btn-ghost scan-btn" data-kind="main" data-force="1">Полная переиндексация</button>
+      </div>
+      {% elif str_root(cfg.library_root) %}<p class="warn small">Отключена в «Настройках» — её книги не показываются.</p>
+      {% else %}<p class="muted small">Не настроена: укажите папку в <a href="/admin/settings">«Настройках»</a>.</p>{% endif %}
+    </div>
+    <div>
+      <h3>{{ cfg.rus_label }} <span class="muted">({{ st.rus or 0 }})</span></h3>
+      {% if cfg.rus_enabled %}
+      <p class="muted small mono">{{ cfg.rus_root }} (с подпапками; .txt и .fb2)</p>
+      <div class="toolbar">
+        <button class="btn scan-btn" data-kind="rus" data-force="0">Сканировать</button>
+        <button class="btn-ghost scan-btn" data-kind="rus" data-force="1">Полная переиндексация</button>
+      </div>
+      {% else %}
+      <p class="muted small">{% if cfg.rus_root %}Отключена в «Настройках» — её книги не показываются.{% else %}Не настроена: задайте папку в <a href="/admin/settings">«Настройках»</a>.{% endif %}</p>
+      {% endif %}
+    </div>
+    <div>
+      <h3>{{ cfg.inpx_label }} <span class="muted">(INPX, {{ st.inpx or 0 }})</span></h3>
+      {% if cfg.inpx_enabled %}
+      <p class="muted small mono">{{ cfg.inpx_file }}<br>архивы: {{ cfg.inpx_root }}</p>
+      {% if inpx_info %}<p class="small">{{ inpx_info.name }}{% if inpx_info.version %} · версия {{ inpx_info.version }}{% endif %}</p>{% endif %}
+      <p class="muted small">Только метаданные. При выходе новой версии замените файл .inpx и нажмите «Обновить».</p>
+      <div class="toolbar">
+        <button class="btn scan-btn" data-kind="inpx" data-force="0">Обновить из .inpx</button>
+        <button class="btn-ghost scan-btn" data-kind="inpx" data-force="1">Импортировать заново</button>
+      </div>
+      {% else %}
+      <p class="muted small">{% if cfg.inpx_file %}Отключена в «Настройках» — её книги не показываются.{% else %}Не настроена: задайте файл .inpx в <a href="/admin/settings">«Настройках»</a>.{% endif %}</p>
+      {% endif %}
+    </div>
+  </div>
+  <div class="toolbar"><button class="btn-ghost" id="clear-cache">Очистить кеш PDF/FB2</button></div>
+  <div id="scan-status" class="scan-status" {% if not scan.running %}hidden{% endif %}>
+    <div class="bar"><i id="scan-bar"></i></div>
+    <div id="scan-text"></div>
+  </div>
+</section>
+
+<section class="panel">
+  <h2>Перевод на русский</h2>
+  <p>Движок: <b>{{ tr_engine }}</b> · английских книг: {{ st.en }} · переведено: <b id="trq-done">{{ trq.done }}</b>
+    · в очереди: <b id="trq-queued">{{ trq.queued }}</b>{% if trq.error %} · с ошибкой: <span class="bad">{{ trq.error }}</span>{% endif %}</p>
+  <div id="trq-current" class="muted small">{% if trq.current %}Сейчас: {{ trq.current.title }}{% endif %}</div>
+  <p class="muted small">Перевести книгу — кнопка на её странице. Много книг сразу — найдите их поиском и нажмите
+    «Перевести найденные англ.» над результатами.</p>
+</section>
+
+<section class="panel">
+  <h2>Качественный перевод (LLM)</h2>
+  <p>Модель: <b>{{ llm_state }}</b></p>
+  <p>Переведено: <b>{{ llmq.done }}</b> · в очереди: <b>{{ llmq.queued }}</b>{% if llmq.error %} · с ошибкой: <span class="bad">{{ llmq.error }}</span>{% endif %}</p>
+  {% if llmq.current %}<p class="muted small">Сейчас: {{ llmq.current.title }} — {{ ((llmq.current.done or 0) * 100 / (llmq.current.total or 1))|round|int }}%{% if llmq.current.eta_min %}, осталось ~{{ llmq.current.eta_min }} мин{% endif %}</p>{% endif %}
+</section>
+
+<section class="panel">
+  <h2>Последние сканирования</h2>
+  {% if scans %}
+  <table class="table small">
+    <thead><tr><th>#</th><th>Библ.</th><th>Начато</th><th>Готово</th><th>Папок</th><th>Новых</th><th>Обновл.</th><th>Без изм.</th><th>Удалено</th><th>Ошибок</th><th>Предупр.</th><th></th></tr></thead>
+    <tbody>
+    {% for s in scans %}
+    <tr><td>{{ s.id }}{% if s.force %}*{% endif %}</td><td>{{ lib_names.get(s.kind, s.kind) }}</td><td>{{ s.started }}</td><td>{{ s.finished or '…' }}</td><td>{{ s.total }}</td>
+      <td>{{ s.added }}</td><td>{{ s.updated }}</td><td>{{ s.unchanged }}</td><td>{{ s.removed }}</td>
+      <td {% if s.errors %}class="bad"{% endif %}>{{ s.errors }}</td><td>{{ s.warnings }}</td>
+      <td><a href="/admin/log?scan={{ s.id }}">журнал</a></td></tr>
+    {% endfor %}
+    </tbody>
+  </table>
+  <p class="muted small">* — полная переиндексация</p>
+  {% else %}<p class="empty">Сканирований ещё не было — нажмите «Сканировать».</p>{% endif %}
+</section>
+
+{% if encs %}
+<section class="panel">
+  <h2>Кодировки текстов</h2>
+  <p>{% for e in encs %}<span class="tag">{{ e[0] }}: {{ e[1] }}</span> {% endfor %}</p>
+</section>
+{% endif %}
+
+<section class="panel">
+  <h2>Настройки</h2>
+  <p class="muted small">Меняются в <code>config.toml</code>, нужен перезапуск.</p>
+  <dl class="facts">
+    <dt>Адрес</dt><dd>http://{{ cfg.host }}:{{ cfg.port }}</dd>
+    <dt>База</dt><dd class="mono">{{ cfg.database }}</dd>
+    <dt>Кеш</dt><dd class="mono">{{ cfg.cache }}</dd>
+    <dt>PDF</dt><dd>{{ cfg.page_format }}, шрифт {{ cfg.font_regular.name }} {{ cfg.font_size }} pt</dd>
+  </dl>
+</section>
+{% endblock %}
+{% block scripts %}<script>initAdmin({{ 'true' if scan.running else 'false' }}); initTrQueue();</script>{% endblock %}

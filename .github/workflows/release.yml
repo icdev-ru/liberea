@@ -1,0 +1,86 @@
+# Выпуск версии:  git tag v1.0.0 && git push origin v1.0.0
+# Собирает портативный zip для Windows, архив для Linux, образ Docker (ghcr.io) и создаёт релиз на GitHub.
+name: Release
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Build portable zip
+        shell: pwsh
+        run: ./scripts/build-windows.ps1 -Version ("${{ github.ref_name }}".TrimStart("v"))
+      - uses: actions/upload-artifact@v4
+        with:
+          name: windows
+          path: dist/*.zip
+
+  linux:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: ./scripts/build-linux.sh "${GITHUB_REF_NAME#v}"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux
+          path: dist/*.tar.gz
+
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/liberea
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+  release:
+    needs: [windows, linux, docker]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Release notes from CHANGELOG
+        run: |
+          VER="${GITHUB_REF_NAME#v}"
+          awk -v v="## $VER" 'index($0, v)==1 {f=1; next} /^## / && f {exit} f' CHANGELOG.md > notes.md
+          [ -s notes.md ] || echo "Либерея $VER" > notes.md
+          cat >> notes.md <<'TXT'
+
+          ### Как установить
+          - **Windows:** скачайте `Liberea-…-windows-x64.zip`, распакуйте, запустите `run.bat`.
+          - **Linux:** скачайте `Liberea-…-linux.tar.gz`, распакуйте, выполните `./packaging/linux/install.sh`.
+          - **Docker:** `docker run -d -p 5555:5555 -v ./data:/data -v /путь/к/книгам:/books:ro ghcr.io/${{ github.repository_owner }}/liberea`
+          TXT
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
+          body_path: notes.md

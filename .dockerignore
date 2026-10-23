@@ -1,0 +1,8 @@
+.git
+.github
+.venv
+data
+config.toml
+dist
+**/__pycache__
+*.bat

@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Первый запуск — {{ site_title }}{% endblock %}
+{% block content %}
+<section class="panel narrow wide-ish">
+  <h1>Добро пожаловать в Либерею</h1>
+  <p class="muted">Это первый запуск. Задайте пароль администратора и, если хотите, сразу укажите папки с книгами —
+    всё это потом можно поменять в админке, раздел «Настройки».</p>
+  {% if err == 'short' %}<p class="notice bad">Пароль слишком короткий — нужно не меньше 6 символов.</p>{% endif %}
+  {% if err == 'mismatch' %}<p class="notice bad">Пароли не совпадают.</p>{% endif %}
+  <form action="/setup" method="post" class="stack">
+    <h2>Пароль администратора</h2>
+    <label>Пароль <input type="password" name="password" required minlength="6" autocomplete="new-password" autofocus></label>
+    <label>Ещё раз <input type="password" name="password2" required minlength="6" autocomplete="new-password"></label>
+
+    <h2>Библиотека <span class="muted small">(необязательно)</span></h2>
+    <label>Название сайта <input name="title" value="{{ cfg.site_title }}"></label>
+    <label>Папка основной библиотеки
+      <input name="main_root" placeholder="D:\Books\Library  или  /srv/books/library">
+      <small class="muted">Внутри — папки «код Название (Автор)», в каждой текст .txt и (необязательно) обложка.</small></label>
+    <label>Папка дополнительной библиотеки
+      <input name="extra_root" placeholder="D:\Books\Other">
+      <small class="muted">Все подпапки просматриваются; каждый файл .txt или .fb2 — отдельная книга.</small></label>
+    <label>Файл коллекции .inpx
+      <input name="inpx_file" placeholder="D:\Books\Collection\collection.inpx">
+      <small class="muted">Каталог в формате MyHomeLib; zip-архивы с книгами должны лежать рядом.</small></label>
+    <button class="btn">Сохранить и войти</button>
+  </form>
+  <p class="muted small">После этого откройте админку и нажмите «Сканировать» у нужной библиотеки.</p>
+</section>
+{% endblock %}

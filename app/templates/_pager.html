@@ -1,0 +1,18 @@
+{% macro pager(request, page, pages) -%}
+{% if pages > 1 %}
+<nav class="pager">
+  {% if page > 1 %}<a href="{{ page_url(request, page=page-1) }}">← Назад</a>{% endif %}
+  {% set lo = [1, page-3]|max %}{% set hi = [pages, page+3]|min %}
+  {% if lo > 1 %}<a href="{{ page_url(request, page=1) }}">1</a>{% if lo > 2 %}<span>…</span>{% endif %}{% endif %}
+  {% for p in range(lo, hi+1) %}
+    {% if p == page %}<b>{{ p }}</b>{% else %}<a href="{{ page_url(request, page=p) }}">{{ p }}</a>{% endif %}
+  {% endfor %}
+  {% if hi < pages %}{% if hi < pages-1 %}<span>…</span>{% endif %}<a href="{{ page_url(request, page=pages) }}">{{ pages }}</a>{% endif %}
+  {% if page < pages %}<a href="{{ page_url(request, page=page+1) }}">Дальше →</a>{% endif %}
+</nav>
+{% endif %}
+{%- endmacro %}
+
+{% macro books_count(n) -%}
+{{ n }} {% if n % 10 == 1 and n % 100 != 11 %}книга{% elif n % 10 in (2,3,4) and n % 100 not in (12,13,14) %}книги{% else %}книг{% endif %}
+{%- endmacro %}
