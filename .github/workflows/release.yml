@@ -52,6 +52,8 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
             type=raw,value=latest
       - uses: docker/build-push-action@v6
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: .
           platforms: linux/amd64,linux/arm64
@@ -64,10 +66,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      # только наши сборки (docker/build-push-action кладёт ещё служебный артефакт *.dockerbuild)
       - uses: actions/download-artifact@v4
         with:
+          pattern: "{windows,linux}"
           path: dist
           merge-multiple: true
+      - run: ls -la dist
       - name: Release notes from CHANGELOG
         run: |
           VER="${GITHUB_REF_NAME#v}"
