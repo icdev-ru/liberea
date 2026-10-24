@@ -71,6 +71,8 @@
   <p>Движок: <b>{{ tr_engine }}</b> · английских книг: {{ st.en }} · переведено: <b id="trq-done">{{ trq.done }}</b>
     · в очереди: <b id="trq-queued">{{ trq.queued }}</b>{% if trq.error %} · с ошибкой: <span class="bad">{{ trq.error }}</span>{% endif %}</p>
   <div id="trq-current" class="muted small">{% if trq.current %}Сейчас: {{ trq.current.title }}{% endif %}</div>
+  <p class="muted small">Модели: <code>get-model.bat</code> — Argos (быстрая), <code>get-model.bat --opus-big</code> — OPUS-MT
+    (качественная); выбрать модель — в <a href="/admin/settings">«Настройках»</a>.</p>
   <p class="muted small">Перевести книгу — кнопка на её странице. Много книг сразу — найдите их поиском и нажмите
     «Перевести найденные англ.» над результатами.</p>
 </section>

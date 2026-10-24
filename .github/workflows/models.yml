@@ -1,0 +1,38 @@
+# Готовые модели перевода для релиза «models-1» (запускается вручную: Actions → Models → Run workflow).
+# Модель OPUS-MT tc-big (Helsinki-NLP, CC-BY 4.0) конвертируется в CTranslate2 и выкладывается
+# отдельным файлом, чтобы `get-model --opus-big` скачивал 250 МБ вместо 890 МБ и не конвертировал на месте.
+name: Models
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  opus-big:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ctranslate2 pyyaml numpy
+      - run: python scripts/build_opus_model.py --out dist
+      - name: Upload to release models-1
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if ! gh release view models-1 >/dev/null 2>&1; then
+            gh release create models-1 --title "Модели перевода / Translation models" --latest=false --notes "$(cat <<'TXT'
+          Готовые модели перевода английский → русский для Либереи. Скачивать вручную не нужно:
+          команда `get-model.bat --opus-big` (Linux: `manage.py get-model --opus-big`) возьмёт файл отсюда сама.
+
+          **model-en_ru-opus-big.zip** — OPUS-MT tc-big (eng-zle), Helsinki-NLP / University of Helsinki,
+          лицензия CC-BY 4.0. Сконвертирована в формат CTranslate2 (int8). Подробности — ATTRIBUTION.md в архиве.
+
+          Ready-made English → Russian translation models for Liberea. OPUS-MT tc-big by Helsinki-NLP,
+          CC-BY 4.0, converted to CTranslate2 int8 (see ATTRIBUTION.md inside the archive).
+          TXT
+          )"
+          fi
+          gh release upload models-1 dist/model-en_ru-opus-big.zip --clobber

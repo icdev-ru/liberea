@@ -63,3 +63,12 @@ def test_first_run_setup(client):
     assert client.get("/admin/settings").status_code == 200
     # мастер больше не открывается
     assert client.get("/setup", follow_redirects=False).status_code == 303
+
+
+def test_opds_in_browser(client):
+    """Браузер получает HTML-страницу с рабочими ссылками, читалка — XML."""
+    html = client.get("/opds/authors", headers={"Accept": "text/html,application/xhtml+xml,*/*"})
+    assert html.headers["content-type"].startswith("text/html")
+    assert 'href="/opds/' in html.text
+    xml_ = client.get("/opds/authors")
+    assert "opds-catalog" in xml_.headers["content-type"]

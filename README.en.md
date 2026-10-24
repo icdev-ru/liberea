@@ -32,6 +32,8 @@ browse from e-readers via OPDS and translate English books into Russian. Runs on
 - **OPDS catalog** for FBReader, Moon+ Reader, KOReader, CoolReader, ReadEra and others.
 - **Translation** of English books into Russian: local and free (Argos / OPUS-MT via CTranslate2), Yandex Cloud,
   or literary quality with a local LLM (LM Studio, Ollama). Translated books become searchable in Russian.
+  Models are installed separately with one command: `get-model.bat` (Argos, fast) or `get-model.bat --opus-big`
+  (OPUS-MT tc-big, better quality; a ready-made CTranslate2 archive is published in the `models-1` release).
 - **Admin panel:** scanning with progress, import log, editing and hiding books, **settings in the browser**,
   first-run wizard, login brute-force protection.
 

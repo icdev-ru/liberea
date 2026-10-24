@@ -191,6 +191,7 @@ def _template_globals():
 
 
 _template_globals()
+on_reload(translate.reset_engine)
 
 
 def fmt_size(n: int | None) -> str:
@@ -870,6 +871,8 @@ SETTINGS_FIELDS = [
     ("inpx", "label", "str", "Название коллекции INPX", ""),
     ("inpx", "file", "path", "Файл .inpx", "Каталог MyHomeLib; архивы с книгами — рядом с ним"),
     ("inpx", "root", "path", "Папка с архивами коллекции", "Пусто — папка файла .inpx"),
+    ("translate", "model", "model", "Модель перевода (англ. → рус.)",
+     "Установка моделей: get-model.bat (Argos, быстрая) и get-model.bat --opus-big (OPUS-MT, качественная)"),
 ]
 
 
@@ -880,7 +883,13 @@ def _settings_values() -> dict:
     defaults = {("site", "title"): "Либерея", ("library", "label"): "Основная",
                 ("extra", "label"): CONFIG.rus_label, ("inpx", "label"): "Коллекция INPX"}
     out = {}
+    tr = raw.get("translate", {})
+    out[("translate", "model")] = ("off" if tr.get("engine") == "off" else
+                                   "yandex" if tr.get("engine") == "yandex" else
+                                   str(tr.get("model_dir", "data/models/en_ru")).replace("\\", "/"))
     for sec, key, typ, _l, _h in SETTINGS_FIELDS:
+        if typ == "model":
+            continue
         v = raw.get(sec, {}).get(key)
         if typ == "bool":
             out[(sec, key)] = True if v is None else bool(v)
@@ -902,7 +911,14 @@ def _legacy_section(sec: str) -> str:
 def admin_settings(request: Request, saved: int = 0, err: str = ""):
     require_admin(request)
     vals = _settings_values()
-    fields = [dict(sec=sec, key=key, typ=typ, label=label, hint=hint, value=vals[(sec, key)],
+    from . import models
+    choices = list(models.installed())
+    if vals[("translate", "model")] not in [c[0] for c in choices] + ["off", "yandex"]:
+        choices.append((vals[("translate", "model")], vals[("translate", "model")] + " — не установлена"))
+    if CONFIG.tr_yandex_key or vals[("translate", "model")] == "yandex":
+        choices.append(("yandex", "Яндекс Переводчик (Yandex Cloud, ключ в config.toml)"))
+    choices.append(("off", "Выключен"))
+    fields = [dict(sec=sec, key=key, typ=typ, label=label, hint=hint, value=vals[(sec, key)], choices=choices,
                    exists=(Path(vals[(sec, key)]).exists() if typ == "path" and vals[(sec, key)] else None))
               for sec, key, typ, label, hint in SETTINGS_FIELDS]
     from .config import settings_path
@@ -917,6 +933,15 @@ async def admin_settings_save(request: Request):
     changes: dict = {}
     for sec, key, typ, _label, _hint in SETTINGS_FIELDS:
         name = f"{sec}.{key}"
+        if typ == "model":
+            m = str(form.get(name, ""))
+            if m == "off":
+                changes["translate"] = {"engine": "off"}
+            elif m == "yandex":
+                changes["translate"] = {"engine": "yandex"}
+            elif m.startswith("data/models/"):
+                changes["translate"] = {"engine": "local", "model_dir": m}
+            continue
         if typ == "bool":
             val = form.get(name) == "1"
         else:

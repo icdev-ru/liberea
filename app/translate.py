@@ -179,13 +179,23 @@ def get_engine():
         return _engine
 
 
+def reset_engine() -> None:
+    """Сбросить загруженную модель (после смены модели в «Настройках»)."""
+    global _engine
+    with _engine_lock:
+        _engine = None
+
+
 def engine_status() -> str:
     """Короткая строка для админки."""
     if CONFIG.tr_engine == "off":
         return "выключен"
     if CONFIG.tr_engine == "local":
         ok = CONFIG.tr_model_dir.exists() and next(CONFIG.tr_model_dir.rglob("model.bin"), None)
-        return "локальный, модель установлена" if ok else "локальный, модель НЕ установлена (manage.py get-model)"
+        if not ok:
+            return "локальный, модель НЕ установлена (get-model.bat или manage.py get-model)"
+        from .models import describe
+        return f"локальный: {describe(CONFIG.tr_model_dir)}"
     if CONFIG.tr_engine == "yandex":
         return "Яндекс" + ("" if CONFIG.tr_yandex_key else ", ключ не задан")
     return CONFIG.tr_engine

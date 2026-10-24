@@ -5,7 +5,7 @@
   python manage.py scan --extra [--force] просканировать дополнительную библиотеку (txt/fb2 с подпапками)
   python manage.py scan --inpx [--force]  импорт/обновление коллекции из .inpx (каталог MyHomeLib)
   python manage.py get-model [файл.argosmodel]   скачать/установить модель перевода en→ru (Argos)
-  python manage.py get-model --opus-big [файл.zip]   модель OPUS-MT tc-big (качественнее, медленнее)
+  python manage.py get-model --opus-big [файл.zip] [--convert]   модель OPUS-MT tc-big (качественнее, медленнее)
   python manage.py translate-test книга.txt [--chars 20000] [--model data/models/en_ru_big]
   python manage.py translate-test книга.txt --engine llm [--chars 3000] [--model id] замер качественного перевода
   python manage.py translate --all-en   поставить в очередь перевод всех английских книг
@@ -112,43 +112,42 @@ def _download(url, dest):
     print()
 
 
-def cmd_get_opus_big(src: str | None):
-    """Модель Helsinki-NLP OPUS-MT tc-big (англ. → рус./укр./бел.), конвертация в CTranslate2 int8."""
-    import shutil
-    import zipfile
+def cmd_get_opus_big(src: str | None, convert: bool = False):
+    """Модель Helsinki-NLP OPUS-MT tc-big (англ. → рус.). По умолчанию — готовый архив из релиза Либереи
+    (~250 МБ); если он недоступен или указан --convert — исходник 890 МБ и конвертация на этом компьютере."""
     from pathlib import Path
 
-    import ctranslate2.converters as conv
-
-    from app.config import BASE_DIR
-    models = BASE_DIR / "data" / "models"
-    models.mkdir(parents=True, exist_ok=True)
-    out = models / "en_ru_big"
-    work = models / "_opus_src"
-    zpath = Path(src) if src else models / "opus_big.zip"
-    if not src:
-        _download(OPUS_BIG_URL, zpath)
-    print("Распаковываю…")
-    shutil.rmtree(work, ignore_errors=True)
-    with zipfile.ZipFile(zpath) as z:
-        z.extractall(work)
-    dec = next(work.rglob("decoder.yml"), None)
-    if not dec:
-        sys.exit("В архиве нет decoder.yml — это не модель OPUS-MT")
-    mdir = dec.parent
-    print("Конвертирую в CTranslate2 (int8), это займёт 1–3 минуты…")
-    shutil.rmtree(out, ignore_errors=True)
-    conv.OpusMTConverter(str(mdir)).convert(str(out), quantization="int8", force=True)
-    for name in ("source.spm", "target.spm", "README.md"):
-        if (mdir / name).exists():
-            shutil.copy(mdir / name, out / name)
-    shutil.rmtree(work, ignore_errors=True)
-    if not src:
-        zpath.unlink(missing_ok=True)
+    from app import models
+    out = models.models_dir() / "en_ru_big"
+    tmp = models.models_dir() / "opus_big.zip"
+    try:
+        if src:
+            zpath = Path(src)
+        elif not convert:
+            try:
+                _download(models.OPUS_BIG_RELEASE_URL, tmp)
+                zpath = tmp
+            except SystemExit:
+                print("Готовый архив недоступен — скачиваю исходную модель и конвертирую сам.")
+                convert = True
+        if convert and not src:
+            _download(models.OPUS_BIG_SRC, tmp)
+            zpath = tmp
+        if models.is_opus_source(zpath):
+            print("Конвертирую в CTranslate2 (int8), это займёт 1–3 минуты и до 3 ГБ памяти…")
+            models.convert_opus(zpath, out)
+        else:
+            print("Распаковываю…")
+            models.install_prepared(zpath, out)
+    except ValueError as e:
+        sys.exit(f"Ошибка: {e}")
+    finally:
+        if not src:
+            tmp.unlink(missing_ok=True)
     size = sum(p.stat().st_size for p in out.rglob("*")) >> 20
     print(f"\nГотово: {out} ({size} МБ)")
-    print('Чтобы включить, в config.toml в разделе [translate] укажите:\n  model_dir = "data/models/en_ru_big"')
-    print("и перезапустите сервер. Сравнить с текущей моделью:\n"
+    print("Включите её: Админка → Настройки → «Модель перевода» → OPUS-MT tc-big.\n"
+          "Сравнить с текущей моделью на одной книге:\n"
           "  manage.py translate-test книга.txt --model data/models/en_ru_big")
 
 
@@ -162,8 +161,8 @@ def cmd_get_model(src: str | None):
     import zipfile
     from pathlib import Path
 
-    from app.config import CONFIG
-    dest: Path = CONFIG.tr_model_dir
+    from app import models
+    dest: Path = models.models_dir() / "en_ru"
     tmp = dest.parent / "en_ru.argosmodel"
     dest.parent.mkdir(parents=True, exist_ok=True)
     if src:
@@ -203,7 +202,7 @@ def cmd_get_model(src: str | None):
         sys.exit(f"В архиве не найдена модель CTranslate2 (model.bin) и sentencepiece (*.model): {tmp}")
     if not src:
         tmp.unlink(missing_ok=True)
-    print(f"Модель установлена: {dest}")
+    print(f"Модель установлена: {dest}\nПерезапускать ничего не нужно — перевод доступен сразу.")
 
 
 def cmd_translate_test(path: str, chars: int, model: str | None = None):
@@ -328,8 +327,8 @@ if __name__ == "__main__":
     elif args[0] == "scan":
         cmd_scan("--force" in args, "rus" if ("--extra" in args or "--rus" in args) else "inpx" if "--inpx" in args else "main")
     elif args[0] == "get-model" and "--opus-big" in args:
-        rest = [a for a in args[1:] if a != "--opus-big"]
-        cmd_get_opus_big(rest[0] if rest else None)
+        rest = [a for a in args[1:] if a not in ("--opus-big", "--convert")]
+        cmd_get_opus_big(rest[0] if rest else None, "--convert" in args)
     elif args[0] == "get-model":
         cmd_get_model(args[1] if len(args) > 1 else None)
     elif args[0] == "translate-test" and len(args) > 1:

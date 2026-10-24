@@ -102,7 +102,8 @@ class Feed:
             info.append("Жанр: " + ", ".join(genre_name(g) for g in b["genre"].split(":") if g))
         info.append("Код: " + (b.get("code") or str(bid)))
         if b.get("txt_size"):
-            info.append(f"Размер: {b['txt_size'] / 1048576:.1f} МБ")
+            n = b["txt_size"]
+            info.append(f"Размер: {n / 1048576:.1f} МБ" if n >= 1048576 else f"Размер: {max(1, n >> 10)} КБ")
         has_ru = "done" in (b.get("tr_status"), b.get("llm_status"))
         if has_ru:
             info.append("Есть перевод на русский")
@@ -145,7 +146,86 @@ class Feed:
         # ссылки и метаданные должны идти до записей — переставляем
         head = [p for p in self.parts if not p.startswith("<entry>")]
         entries = [p for p in self.parts if p.startswith("<entry>")]
-        return Response("\n".join(head + entries + ["</feed>"]), media_type=self.kind + ";charset=utf-8")
+        xml = "\n".join(head + entries + ["</feed>"])
+        if _is_browser(self.request):
+            return Response(feed_to_html(xml), media_type="text/html;charset=utf-8")
+        return Response(xml, media_type=self.kind + ";charset=utf-8")
+
+
+# ====================================================================== просмотр в браузере
+def _is_browser(request: Request) -> bool:
+    """Обычный браузер (а не читалка) — показать каталог страницей HTML. ?format=xml — всегда XML."""
+    if request.query_params.get("format") == "xml":
+        return False
+    acc = request.headers.get("accept", "")
+    return "text/html" in acc and "application/xhtml+xml" in acc
+
+
+def feed_to_html(xml: str) -> str:
+    import xml.etree.ElementTree as ET
+    ns = {"a": "http://www.w3.org/2005/Atom", "os": "http://a9.com/-/spec/opensearch/1.1/"}
+    root = ET.fromstring(xml.encode("utf-8"))
+
+    def links(el):
+        return [(lk.get("rel", ""), lk.get("href", ""), lk.get("type", ""), lk.get("title", ""))
+                for lk in el.findall("a:link", ns)]
+
+    def path(href: str) -> str:  # ссылки — относительно сайта
+        i = href.find("/", href.find("//") + 2) if "//" in href else 0
+        return href[i:] if i > 0 else href
+
+    title = root.findtext("a:title", "", ns)
+    fl = links(root)
+    up = next((h for r, h, _t, _ti in fl if r == "up"), None)
+    nav = [(lbl, next((h for r, h, _t, _ti in fl if r == rel), None))
+           for rel, lbl in (("first", "« в начало"), ("previous", "← назад"), ("next", "дальше →"))]
+    total = root.findtext("os:totalResults", "", ns)
+    out = ['<!doctype html><html lang="ru"><head><meta charset="utf-8">'
+           '<meta name="viewport" content="width=device-width, initial-scale=1">',
+           f"<title>{escape(title)} — OPDS</title>",
+           '<link rel="stylesheet" href="/static/style.css"><style>'
+           '.opds{max-width:900px;margin:0 auto;padding:16px}.opds-e{display:flex;gap:12px;padding:10px 0;'
+           'border-bottom:1px solid var(--line)}.opds-e img{width:56px;height:80px;object-fit:cover;border-radius:4px}'
+           '.opds-e .t{font:600 1.02rem var(--serif)}.opds-e .c{color:var(--muted);font-size:.88rem}'
+           '.opds-e .d a{margin-right:6px}.opds-note{font-size:.85rem;color:var(--muted)}</style></head>'
+           '<body><main class="opds">',
+           '<p class="opds-note">Это каталог OPDS для читалок (FBReader, Moon+ Reader, KOReader…): добавьте в читалку адрес '
+           '<code>…/opds</code>. Здесь он показан для проверки. <a href="/">Обычный сайт →</a></p>',
+           '<form action="/opds/search" method="get" class="inline-form">'
+           '<input type="search" name="q" placeholder="Поиск в каталоге"><button>Найти</button></form>',
+           '<p>' + (f'<a href="{escape(path(up))}">↑ наверх</a> · ' if up else "") + '<a href="/opds">каталог</a></p>',
+           f"<h1>{escape(title)}</h1>" + (f'<p class="muted">Всего: {escape(total)}</p>' if total else "")]
+    for e in root.findall("a:entry", ns):
+        el = links(e)
+        t = e.findtext("a:title", "", ns)
+        content = e.findtext("a:content", "", ns)
+        sub = next((h for r, h, _t, _ti in el if r in ("subsection", "") and "atom+xml" in _t), None)
+        thumb = next((h for r, h, _t, _ti in el if r.endswith("image/thumbnail")), None)
+        acq = [(h, ti or _t) for r, h, _t, ti in el if "acquisition" in r]
+        rel = [(h, ti) for r, h, _t, ti in el if r == "related"]
+        authors = ", ".join(a.findtext("a:name", "", ns) for a in e.findall("a:author", ns))
+        out.append('<div class="opds-e">')
+        if thumb:
+            out.append(f'<img loading="lazy" src="{escape(path(thumb))}" alt="" onerror="this.remove()">')
+        out.append("<div>")
+        out.append(f'<div class="t"><a href="{escape(path(sub))}">{escape(t)}</a></div>' if sub
+                   else f'<div class="t">{escape(t)}</div>')
+        if authors:
+            out.append(f'<div class="c">{escape(authors)}</div>')
+        if content:
+            out.append(f'<div class="c">{escape(content)}</div>')
+        if acq:
+            out.append('<div class="d dl">' + "".join(f'<a href="{escape(path(h))}">{escape(ti)}</a>' for h, ti in acq)
+                       + "</div>")
+        if rel:
+            out.append('<div class="c">' + " · ".join(f'<a href="{escape(path(h))}">{escape(ti)}</a>' for h, ti in rel)
+                       + "</div>")
+        out.append("</div></div>")
+    pg = " · ".join(f'<a href="{escape(path(h))}">{lbl}</a>' for lbl, h in nav if h)
+    if pg:
+        out.append(f'<p class="pager">{pg}</p>')
+    out.append("</main></body></html>")
+    return "".join(out)
 
 
 def _books_feed(request, fid, title, books, total, page, path, params, up="/opds"):

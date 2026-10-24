@@ -12,9 +12,16 @@
     {% if f.sec != ns.group %}
       {% if ns.group %}</fieldset>{% endif %}
       {% set ns.group = f.sec %}
-      <fieldset class="panel"><legend>{{ {'site': 'Сайт', 'library': 'Основная библиотека', 'extra': 'Дополнительная библиотека', 'inpx': 'Коллекция INPX'}[f.sec] }}</legend>
+      <fieldset class="panel"><legend>{{ {'site': 'Сайт', 'library': 'Основная библиотека', 'extra': 'Дополнительная библиотека', 'inpx': 'Коллекция INPX', 'translate': 'Перевод'}[f.sec] }}</legend>
     {% endif %}
-    {% if f.typ == 'bool' %}
+    {% if f.typ == 'model' %}
+      <label>{{ f.label }}
+        <select name="{{ f.sec }}.{{ f.key }}">
+          {% for val, desc in f.choices %}<option value="{{ val }}" {% if val == f.value %}selected{% endif %}>{{ desc }}</option>{% endfor %}
+        </select>
+        <small class="muted">{{ f.hint }}</small>
+      </label>
+    {% elif f.typ == 'bool' %}
       <label class="check"><input type="checkbox" name="{{ f.sec }}.{{ f.key }}" value="1" {% if f.value %}checked{% endif %}> {{ f.label }}</label>
     {% else %}
       <label>{{ f.label }}
